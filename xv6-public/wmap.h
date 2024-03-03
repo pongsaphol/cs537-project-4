@@ -1,3 +1,4 @@
+#include "types.h"
 // Flags for wmap
 #define MAP_PRIVATE 0x0001
 #define MAP_SHARED 0x0002
