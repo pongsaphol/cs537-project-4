@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "wmap.h"
 
 struct {
   struct spinlock lock;
@@ -112,6 +113,10 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  for(int i = 0; i < MAX_MEMMAPS; i++) {
+    p->memmaps[i].used = 0;
+  }
+
   return p;
 }
 
@@ -203,6 +208,17 @@ fork(void)
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
+  for(i = 0; i < MAX_MEMMAPS; i++) {
+    if(curproc->memmaps[i].used) {
+      np->memmaps[i] = curproc->memmaps[i];
+
+      if (np->memmaps[i].flags & MAP_PRIVATE) {
+        // TODO: allocate new physical pages and copy parent content
+        // (or do COW)
+      }
+    }
+  }
+
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
@@ -258,6 +274,17 @@ exit(void)
       p->parent = initproc;
       if(p->state == ZOMBIE)
         wakeup1(initproc);
+    }
+  }
+
+  for(int i = 0; i < MAX_MEMMAPS; i++) {
+    if(curproc->memmaps[i].used) {
+      if((curproc->memmaps[i].fd != -1) && (curproc->memmaps[i].flags & MAP_SHARED)) {
+        // TODO: write back to file
+      }
+
+      wunmap(curproc->memmaps[i].base);
+      curproc->memmaps[i].used = 0;
     }
   }
 

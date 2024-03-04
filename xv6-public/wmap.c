@@ -33,6 +33,7 @@ sys_wremap(void)
     return -1;
   }
 }
+
 int 
 sys_getwmapinfo(void)
 {
