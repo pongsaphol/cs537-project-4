@@ -123,7 +123,7 @@ sys_getpgdirinfo(void)
   }
   pdinfo->n_upages = 0;
   pde_t* pgdir = myproc()->pgdir;
-  for (int i = 0; i < 0x100; ++i) {
+  for (int i = 0; i < 0x200; ++i) {
     if (pgdir[i] & PTE_P) {
       pte_t *pgtab;
       pgtab = (pte_t*)P2V(PTE_ADDR(pgdir[i]));
