@@ -12,10 +12,17 @@ sys_wmap(void)
   uint addr;
   int length;
   int flags;
-  int fd;
-  if (argint(0, (int*)&addr) < 0 || argint(1, &length) < 0 || argint(2, &flags) < 0 || argint(3, &fd) < 0) {
-    return -1;
+  if (argint(0, (int*)&addr) < 0 || argint(1, &length) < 0 || argint(2, &flags) < 0) {
+    return FAILED;
   }
+
+  struct file *f = 0;
+  if (!(flags & MAP_ANONYMOUS)) {
+    if (argfd(3, 0, &f) < 0) {
+      return FAILED;
+    }
+  }
+
   struct proc* p = myproc();
   if (!(flags & MAP_FIXED)) {
     addr = 0;
@@ -51,11 +58,22 @@ sys_wmap(void)
 
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
     if (p->memmaps[i].used == 0) {
+      if (flags & MAP_ANONYMOUS) {
+        p->memmaps[i].fd = -1;
+      } else {
+        p->memmaps[i].fd = (uint)f;
+        uint a = PGROUNDDOWN(addr);
+        uint end = PGROUNDDOWN(addr + length - 1);
+        for (uint base = a; base <= end; base += PGSIZE) {
+          char *mem = kalloc();
+          mappages(p->pgdir, (char*)base, PGSIZE, V2P(mem), PTE_W | PTE_U);
+        }
+        fileread(f, (char*)addr, length);
+      }
       p->memmaps[i].used = 1;
       p->memmaps[i].base = addr;
       p->memmaps[i].length = length;
       p->memmaps[i].flags = flags;
-      p->memmaps[i].fd = fd;
       break;
     }
   }
