@@ -18,9 +18,37 @@ sys_wmap(void)
   }
   struct proc* p = myproc();
   if (!(flags & MAP_FIXED)) {
+    addr = 0;
     // add init addr
-
+    for (uint st = 0x60000000; st + length < 0x80000000; st += PGSIZE) {
+      int found = 0;
+      for (int i = 0; i < MAX_MEMMAPS; ++i) {
+        if (p->memmaps[i].used == 1 && ( 
+          (p->memmaps[i].base <= st && st < p->memmaps[i].base + p->memmaps[i].length) ||
+          (p->memmaps[i].base <= st + length - 1 && st + length - 1 < p->memmaps[i].base + p->memmaps[i].length) ||
+          (st <= p->memmaps[i].base && p->memmaps[i].base < st + length) ||
+          (st <= p->memmaps[i].base + p->memmaps[i].length - 1 && p->memmaps[i].base + p->memmaps[i].length - 1 < st + length)
+        )) {
+          found = 1;
+          break;
+        }
+      }
+      if (found == 0) {
+        addr = st;
+        break;
+      }
+    } 
+    if (addr == 0) {
+      return FAILED;
+    }
   }
+
+  for (int i = 0; i < MAX_MEMMAPS; ++i) {
+    if (p->memmaps[i].used == 1 && p->memmaps[i].base <= addr && addr < p->memmaps[i].base + p->memmaps[i].length) {
+      return FAILED;
+    }
+  }
+
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
     if (p->memmaps[i].used == 0) {
       p->memmaps[i].used = 1;
