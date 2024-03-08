@@ -40,7 +40,7 @@ struct memmap {
   uint base;    // start address of memory mapping
   uint length;  // length in bytes of memory mapping
   int flags;    // flags used
-  int fd;       // file descriptor, -1 if not backed by file
+  struct file *f;  // file used
   int used;     // 1 if used, 0 if not
 };
 

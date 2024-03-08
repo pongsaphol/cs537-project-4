@@ -288,7 +288,7 @@ exit(void)
 
   for(int i = 0; i < MAX_MEMMAPS; i++) {
     if(curproc->memmaps[i].used) {
-      if((curproc->memmaps[i].fd != -1) && (curproc->memmaps[i].flags & MAP_SHARED)) {
+      if((curproc->memmaps[i].f != 0) && (curproc->memmaps[i].flags & MAP_SHARED)) {
         // TODO: write back to file
       }
 

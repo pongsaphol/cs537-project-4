@@ -59,16 +59,9 @@ sys_wmap(void)
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
     if (p->memmaps[i].used == 0) {
       if (flags & MAP_ANONYMOUS) {
-        p->memmaps[i].fd = -1;
+        p->memmaps[i].f = 0;
       } else {
-        p->memmaps[i].fd = (uint)f;
-        uint a = PGROUNDDOWN(addr);
-        uint end = PGROUNDDOWN(addr + length - 1);
-        for (uint base = a; base <= end; base += PGSIZE) {
-          char *mem = kalloc();
-          mappages(p->pgdir, (char*)base, PGSIZE, V2P(mem), PTE_W | PTE_U);
-        }
-        fileread(f, (char*)addr, length);
+        p->memmaps[i].f = f;
       }
       p->memmaps[i].used = 1;
       p->memmaps[i].base = addr;

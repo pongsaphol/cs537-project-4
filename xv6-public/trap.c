@@ -8,6 +8,9 @@
 #include "traps.h"
 #include "spinlock.h"
 #include "wmap.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
 
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
@@ -49,6 +52,16 @@ void manage_page_fault() {
         }
         uint round_addr = PGROUNDDOWN(addr);
         mappages(myproc()->pgdir, (char*)round_addr, 4096, V2P(mem), PTE_W | PTE_U);
+        // copy from file to memory
+        if (myproc()->memmaps[i].f != 0) {
+          struct file* f = myproc()->memmaps[i].f;
+          uint n_offset = 4096;
+          if (round_addr == PGROUNDDOWN(myproc()->memmaps[i].base + myproc()->memmaps[i].length - 1)) {
+            n_offset = myproc()->memmaps[i].base + myproc()->memmaps[i].length - round_addr;
+          }
+          f->off = round_addr - myproc()->memmaps[i].base;
+          fileread(f, (char*)round_addr, n_offset);
+        }
         break;
       }
     } 
