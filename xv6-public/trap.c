@@ -46,7 +46,8 @@ void manage_page_fault() {
           myproc()->killed = 1;
           break;
         }
-        mappages(myproc()->pgdir, (char*)PGROUNDDOWN(addr), 4096, V2P(mem), PTE_W | PTE_U);
+        uint round_addr = PGROUNDDOWN(addr);
+        mappages(myproc()->pgdir, (char*)round_addr, 4096, V2P(mem), PTE_W | PTE_U);
         break;
       }
     } 

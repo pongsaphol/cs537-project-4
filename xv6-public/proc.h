@@ -41,7 +41,7 @@ struct memmap {
   uint length;  // length in bytes of memory mapping
   int flags;    // flags used
   int fd;       // file descriptor, -1 if not backed by file
-  int used;     //
+  int used;     // 1 if used, 0 if not
 };
 
 // Per-process state
