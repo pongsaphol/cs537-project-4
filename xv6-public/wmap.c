@@ -32,6 +32,10 @@ sys_wmap(void)
   return (int)addr;
 }
 
+int real_wunmap(uint addr) {
+  return 0;
+}
+
 int 
 sys_wunmap(void) 
 {
@@ -39,7 +43,7 @@ sys_wunmap(void)
   if (argint(0, (int*)&addr) < 0) {
     return -1;
   }
-  return 0;
+  return real_wunmap(addr);
 }
 
 int 

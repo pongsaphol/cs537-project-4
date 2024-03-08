@@ -250,6 +250,15 @@ exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
+
+  // FREE ALL WMAP
+  for(int i = 0; i < MAX_MEMMAPS; i++) {
+    if(curproc->memmaps[i].used) {
+      real_wunmap(curproc->memmaps[i].base);
+      curproc->memmaps[i].used = 0;
+    }
+  }
+
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
