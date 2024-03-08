@@ -215,6 +215,26 @@ fork(void)
       if (np->memmaps[i].flags & MAP_PRIVATE) {
         // TODO: allocate new physical pages and copy parent content
         // (or do COW)
+        uint a = np->memmaps[i].base;
+        uint last = PGROUNDDOWN(np->memmaps[i].base + np->memmaps[i].length - 1);
+        for (uint base = a; base <= last; base += PGSIZE) {
+          pte_t *pte = walkpgdir(curproc->pgdir, (char*)base, 0);
+          if (*pte & PTE_P) {
+            char* mem = kalloc();
+            memmove(mem, (char*)P2V(PTE_ADDR(*pte)), PGSIZE);
+            mappages(np->pgdir, (char*)base, PGSIZE, V2P(mem), PTE_W | PTE_U);
+          }
+        }
+      } 
+      if (np->memmaps[i].flags & MAP_SHARED) {
+        uint a = np->memmaps[i].base;
+        uint last = PGROUNDDOWN(np->memmaps[i].base + np->memmaps[i].length - 1);
+        for (uint base = a; base <= last; base += PGSIZE) {
+          pte_t *pte = walkpgdir(curproc->pgdir, (char*)base, 0);
+          if (*pte & PTE_P) {
+            mappages(np->pgdir, (char*)base, PGSIZE, PTE_ADDR(*pte), PTE_W | PTE_U);
+          }
+        }
       }
     }
   }
