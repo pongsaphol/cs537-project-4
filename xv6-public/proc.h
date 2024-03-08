@@ -1,13 +1,3 @@
-#define MAX_MEMMAPS 16
-
-struct memmap {
-  uint base;    // start address of memory mapping
-  uint length;  // length in bytes of memory mapping
-  int flags;    // flags used
-  int fd;       // file descriptor, -1 if not backed by file
-  int used;     //
-};
-
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -43,6 +33,16 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+
+#define MAX_MEMMAPS 16
+
+struct memmap {
+  uint base;    // start address of memory mapping
+  uint length;  // length in bytes of memory mapping
+  int flags;    // flags used
+  int fd;       // file descriptor, -1 if not backed by file
+  int used;     //
+};
 
 // Per-process state
 struct proc {

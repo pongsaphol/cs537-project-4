@@ -283,7 +283,7 @@ exit(void)
         // TODO: write back to file
       }
 
-      wunmap(curproc->memmaps[i].base);
+      // wunmap(curproc->memmaps[i].base);
       curproc->memmaps[i].used = 0;
     }
   }
