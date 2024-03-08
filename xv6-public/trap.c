@@ -41,6 +41,7 @@ void manage_page_fault() {
       if (myproc()->memmaps[i].base <= addr && addr < myproc()->memmaps[i].base + myproc()->memmaps[i].length) {
         pushed = 1;
         char *mem = kalloc();
+        memset(mem, 0, 4096);
         if (mem == 0) {
           cprintf("Out of memory\n");
           myproc()->killed = 1;
