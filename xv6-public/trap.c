@@ -40,8 +40,8 @@ void manage_page_fault() {
   int pushed = 0;
   uint addr = rcr2();
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
-    if (myproc()->memmaps[i].used == 1) {
-      if (myproc()->memmaps[i].base <= addr && addr < myproc()->memmaps[i].base + myproc()->memmaps[i].length) {
+    if (myproc()->memmaps[i]) {
+      if (myproc()->memmaps[i]->base <= addr && addr < myproc()->memmaps[i]->base + myproc()->memmaps[i]->length) {
         pushed = 1;
         char *mem = kalloc();
         memset(mem, 0, 4096);
@@ -53,13 +53,13 @@ void manage_page_fault() {
         uint round_addr = PGROUNDDOWN(addr);
         mappages(myproc()->pgdir, (char*)round_addr, 4096, V2P(mem), PTE_W | PTE_U);
         // copy from file to memory
-        if (myproc()->memmaps[i].f != 0) {
-          struct file* f = myproc()->memmaps[i].f;
+        if (myproc()->memmaps[i]->f != 0) {
+          struct file* f = myproc()->memmaps[i]->f;
           uint n_offset = 4096;
-          if (round_addr == PGROUNDDOWN(myproc()->memmaps[i].base + myproc()->memmaps[i].length - 1)) {
-            n_offset = myproc()->memmaps[i].base + myproc()->memmaps[i].length - round_addr;
+          if (round_addr == PGROUNDDOWN(myproc()->memmaps[i]->base + myproc()->memmaps[i]->length - 1)) {
+            n_offset = myproc()->memmaps[i]->base + myproc()->memmaps[i]->length - round_addr;
           }
-          f->off = round_addr - myproc()->memmaps[i].base;
+          f->off = round_addr - myproc()->memmaps[i]->base;
           fileread(f, (char*)round_addr, n_offset);
         }
         break;

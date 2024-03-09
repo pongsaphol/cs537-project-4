@@ -30,11 +30,11 @@ sys_wmap(void)
     for (uint st = 0x60000000; st + length < 0x80000000; st += PGSIZE) {
       int found = 0;
       for (int i = 0; i < MAX_MEMMAPS; ++i) {
-        if (p->memmaps[i].used == 1 && ( 
-          (p->memmaps[i].base <= st && st < p->memmaps[i].base + p->memmaps[i].length) ||
-          (p->memmaps[i].base <= st + length - 1 && st + length - 1 < p->memmaps[i].base + p->memmaps[i].length) ||
-          (st <= p->memmaps[i].base && p->memmaps[i].base < st + length) ||
-          (st <= p->memmaps[i].base + p->memmaps[i].length - 1 && p->memmaps[i].base + p->memmaps[i].length - 1 < st + length)
+        if (p->memmaps[i] && ( 
+          (p->memmaps[i]->base <= st && st < p->memmaps[i]->base + p->memmaps[i]->length) ||
+          (p->memmaps[i]->base <= st + length - 1 && st + length - 1 < p->memmaps[i]->base + p->memmaps[i]->length) ||
+          (st <= p->memmaps[i]->base && p->memmaps[i]->base < st + length) ||
+          (st <= p->memmaps[i]->base + p->memmaps[i]->length - 1 && p->memmaps[i]->base + p->memmaps[i]->length - 1 < st + length)
         )) {
           found = 1;
           break;
@@ -51,22 +51,23 @@ sys_wmap(void)
   }
 
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
-    if (p->memmaps[i].used == 1 && p->memmaps[i].base <= addr && addr < p->memmaps[i].base + p->memmaps[i].length) {
+    if (p->memmaps[i] && p->memmaps[i]->base <= addr && addr < p->memmaps[i]->base + p->memmaps[i]->length) {
       return FAILED;
     }
   }
 
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
-    if (p->memmaps[i].used == 0) {
+    if (!p->memmaps[i]) {
+      p->memmaps[i] = (struct memmap*)kalloc(); 
       if (flags & MAP_ANONYMOUS) {
-        p->memmaps[i].f = 0;
+        p->memmaps[i]->f = 0;
       } else {
-        p->memmaps[i].f = f;
+        p->memmaps[i]->f = f;
       }
-      p->memmaps[i].used = 1;
-      p->memmaps[i].base = addr;
-      p->memmaps[i].length = length;
-      p->memmaps[i].flags = flags;
+      p->memmaps[i]->base = addr;
+      p->memmaps[i]->length = length;
+      p->memmaps[i]->flags = flags;
+      p->memmaps[i]->ref = 1;
       break;
     }
   }
@@ -107,13 +108,17 @@ sys_getwmapinfo(void)
   if (argptr(0, (char**)&wminfo, sizeof(struct wmapinfo)) < 0) {
     return -1;
   }
+  pte_t *pte = walkpgdir(myproc()->pgdir, (void*)0x60000000, 0);
+  if (pte != 0) {
+    cprintf("pte: %x val: %d\n", *pte, *(char*)P2V(PTE_ADDR((*pte))));
+  }
   wminfo->total_mmaps = 0;
   for (int i = 0; i < MAX_MEMMAPS; ++i) {
-    if (myproc()->memmaps[i].used == 1) {
-      wminfo->addr[wminfo->total_mmaps] = myproc()->memmaps[i].base;
-      wminfo->length[wminfo->total_mmaps] = myproc()->memmaps[i].length;
+    if (myproc()->memmaps[i]) {
+      wminfo->addr[wminfo->total_mmaps] = myproc()->memmaps[i]->base;
+      wminfo->length[wminfo->total_mmaps] = myproc()->memmaps[i]->length;
       wminfo->n_loaded_pages[wminfo->total_mmaps] = 0;
-      for (int base = myproc()->memmaps[i].base; base < myproc()->memmaps[i].base + myproc()->memmaps[i].length; base += PGSIZE) {
+      for (int base = myproc()->memmaps[i]->base; base < myproc()->memmaps[i]->base + myproc()->memmaps[i]->length; base += PGSIZE) {
         pte_t* pte = walkpgdir(myproc()->pgdir, (void*)base, 0);
         if (pte && (*pte & PTE_P)) {
           wminfo->n_loaded_pages[wminfo->total_mmaps]++;

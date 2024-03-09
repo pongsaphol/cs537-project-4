@@ -114,7 +114,7 @@ found:
   p->context->eip = (uint)forkret;
 
   for(int i = 0; i < MAX_MEMMAPS; i++) {
-    p->memmaps[i].used = 0;
+    p->memmaps[i] = 0;
   }
 
   return p;
@@ -208,31 +208,39 @@ fork(void)
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
-  for(i = 0; i < MAX_MEMMAPS; i++) {
-    if(curproc->memmaps[i].used) {
-      np->memmaps[i] = curproc->memmaps[i];
+  for (i = 0; i < MAX_MEMMAPS; i++) {
+    if (curproc->memmaps[i]) {
+      
 
-      if (np->memmaps[i].flags & MAP_PRIVATE) {
+      if (np->memmaps[i]->flags & MAP_PRIVATE) {
         // TODO: allocate new physical pages and copy parent content
+        np->memmaps[i] = (struct memmap*)kalloc();
+        *(np->memmaps[i]) = *(curproc->memmaps[i]);
         // (or do COW)
-        uint a = np->memmaps[i].base;
-        uint last = PGROUNDDOWN(np->memmaps[i].base + np->memmaps[i].length - 1);
+        uint a = np->memmaps[i]->base;
+        uint last = PGROUNDDOWN(np->memmaps[i]->base + np->memmaps[i]->length - 1);
         for (uint base = a; base <= last; base += PGSIZE) {
           pte_t *pte = walkpgdir(curproc->pgdir, (char*)base, 0);
-          if (*pte & PTE_P) {
-            char* mem = kalloc();
-            memmove(mem, (char*)P2V(PTE_ADDR(*pte)), PGSIZE);
-            mappages(np->pgdir, (char*)base, PGSIZE, V2P(mem), PTE_W | PTE_U);
+          if (pte) {
+            if (*pte & PTE_P) {
+              char* mem = kalloc();
+              memmove(mem, (char*)P2V(PTE_ADDR(*pte)), PGSIZE);
+              mappages(np->pgdir, (char*)base, PGSIZE, V2P(mem), PTE_W | PTE_U);
+            }
           }
         }
       } 
-      if (np->memmaps[i].flags & MAP_SHARED) {
-        uint a = np->memmaps[i].base;
-        uint last = PGROUNDDOWN(np->memmaps[i].base + np->memmaps[i].length - 1);
+      if (np->memmaps[i]->flags & MAP_SHARED) {
+        np->memmaps[i] = curproc->memmaps[i];
+        np->memmaps[i]->ref++;
+        uint a = np->memmaps[i]->base;
+        uint last = PGROUNDDOWN(np->memmaps[i]->base + np->memmaps[i]->length - 1);
         for (uint base = a; base <= last; base += PGSIZE) {
           pte_t *pte = walkpgdir(curproc->pgdir, (char*)base, 0);
-          if (*pte & PTE_P) {
-            mappages(np->pgdir, (char*)base, PGSIZE, PTE_ADDR(*pte), PTE_W | PTE_U);
+          if (pte) {
+            if (*pte & PTE_P) {
+              mappages(np->pgdir, (char*)base, PGSIZE, PTE_ADDR(*pte), PTE_W | PTE_U);
+            }
           }
         }
       }
@@ -270,15 +278,6 @@ exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
-
-  // FREE ALL WMAP
-  for(int i = 0; i < MAX_MEMMAPS; i++) {
-    if(curproc->memmaps[i].used) {
-      real_wunmap(curproc->memmaps[i].base);
-      curproc->memmaps[i].used = 0;
-    }
-  }
-
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
@@ -306,16 +305,17 @@ exit(void)
     }
   }
 
-  for(int i = 0; i < MAX_MEMMAPS; i++) {
-    if(curproc->memmaps[i].used) {
-      if((curproc->memmaps[i].f != 0) && (curproc->memmaps[i].flags & MAP_SHARED)) {
-        // TODO: write back to file
-      }
+  // for(int i = 0; i < MAX_MEMMAPS; i++) {
+  //   if(curproc->memmaps[i].used) {
+  //     if((curproc->memmaps[i].f != 0) && (curproc->memmaps[i].flags & MAP_SHARED)) {
+  //       // TODO: write back to file
+  //     }
 
-      // wunmap(curproc->memmaps[i].base);
-      curproc->memmaps[i].used = 0;
-    }
-  }
+  //     // wunmap(curproc->memmaps[i].base);
+  //     curproc->memmaps[i].used = 0;
+  //   }
+  // }
+  cprintf("EXITED\n");
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;

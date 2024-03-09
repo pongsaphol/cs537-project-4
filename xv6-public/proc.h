@@ -37,11 +37,11 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 #define MAX_MEMMAPS 16
 
 struct memmap {
+  int ref;
   uint base;    // start address of memory mapping
   uint length;  // length in bytes of memory mapping
   int flags;    // flags used
   struct file *f;  // file used
-  int used;     // 1 if used, 0 if not
 };
 
 // Per-process state
@@ -60,7 +60,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  struct memmap memmaps[MAX_MEMMAPS];
+  struct memmap *memmaps[MAX_MEMMAPS];
 };
 
 // Process memory is laid out contiguously, low addresses first:
