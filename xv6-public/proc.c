@@ -210,9 +210,7 @@ fork(void)
 
   for (i = 0; i < MAX_MEMMAPS; i++) {
     if (curproc->memmaps[i]) {
-      
-
-      if (np->memmaps[i]->flags & MAP_PRIVATE) {
+      if (curproc->memmaps[i]->flags & MAP_PRIVATE) {
         // TODO: allocate new physical pages and copy parent content
         np->memmaps[i] = (struct memmap*)kalloc();
         *(np->memmaps[i]) = *(curproc->memmaps[i]);
@@ -230,7 +228,7 @@ fork(void)
           }
         }
       } 
-      if (np->memmaps[i]->flags & MAP_SHARED) {
+      if (curproc->memmaps[i]->flags & MAP_SHARED) {
         np->memmaps[i] = curproc->memmaps[i];
         np->memmaps[i]->ref++;
         uint a = np->memmaps[i]->base;
@@ -305,17 +303,11 @@ exit(void)
     }
   }
 
-  // for(int i = 0; i < MAX_MEMMAPS; i++) {
-  //   if(curproc->memmaps[i].used) {
-  //     if((curproc->memmaps[i].f != 0) && (curproc->memmaps[i].flags & MAP_SHARED)) {
-  //       // TODO: write back to file
-  //     }
-
-  //     // wunmap(curproc->memmaps[i].base);
-  //     curproc->memmaps[i].used = 0;
-  //   }
-  // }
-  cprintf("EXITED\n");
+  for(int i = 0; i < MAX_MEMMAPS; i++) {
+    if(curproc->memmaps[i]) {
+      real_wunmap(curproc->memmaps[i]->base); 
+    }
+  }
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
