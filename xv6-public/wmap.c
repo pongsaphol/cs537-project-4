@@ -10,6 +10,41 @@
 #include "sleeplock.h"
 #include "file.h"
 
+int can_expand_in_place(struct proc* p, uint oldaddr, int oldsize, int newsize)
+{
+  uint newend = oldaddr + newsize;
+  if (newend >= 0x80000000) return 0;
+
+  for (int i = 0; i < MAX_MEMMAPS; ++i) {
+    if (p->memmaps[i] && (p->memmaps[i]->base != oldaddr)) {
+      uint mapstart = p->memmaps[i]->base;
+      uint mapend = mapstart + p->memmaps[i]->length;
+      if ((oldaddr < mapend && newend > mapstart)) return 0;
+    }
+  }
+
+  return 1;
+}
+
+uint find_new_location(struct proc* p, int size)
+{
+  for (uint addr = 0x60000000; addr < 0x80000000 - size; addr += PGSIZE) {
+    int overlap = 0;
+      for (int i = 0; i < MAX_MEMMAPS; ++i) {
+        if (p->memmaps[i]) {
+          uint mapstart = p->memmaps[i]->base;
+          uint mapend = mapstart + p->memmaps[i]->length;
+          if ((addr < mapend && addr + size > mapstart)) {
+            overlap = 1;
+            break;
+          }
+        }
+      }
+      if (!overlap) return addr;
+    }
+    return 0;
+}
+
 
 int 
 sys_wmap(void) 
@@ -30,26 +65,7 @@ sys_wmap(void)
 
   struct proc* p = myproc();
   if (!(flags & MAP_FIXED)) {
-    addr = 0;
-    // add init addr
-    for (uint st = 0x60000000; st + length < 0x80000000; st += PGSIZE) {
-      int found = 0;
-      for (int i = 0; i < MAX_MEMMAPS; ++i) {
-        if (p->memmaps[i] && ( 
-          (p->memmaps[i]->base <= st && st < p->memmaps[i]->base + p->memmaps[i]->length) ||
-          (p->memmaps[i]->base <= st + length - 1 && st + length - 1 < p->memmaps[i]->base + p->memmaps[i]->length) ||
-          (st <= p->memmaps[i]->base && p->memmaps[i]->base < st + length) ||
-          (st <= p->memmaps[i]->base + p->memmaps[i]->length - 1 && p->memmaps[i]->base + p->memmaps[i]->length - 1 < st + length)
-        )) {
-          found = 1;
-          break;
-        }
-      }
-      if (found == 0) {
-        addr = st;
-        break;
-      }
-    } 
+    addr = find_new_location(p, length);
     if (addr == 0) {
       return FAILED;
     }
@@ -126,17 +142,78 @@ sys_wunmap(void)
   return real_wunmap(addr);
 }
 
-int 
-sys_wremap(void) 
+int sys_wremap(void)
 {
   uint oldaddr;
-  int oldsize;
-  int newsize;
-  int flags;
+  int oldsize, newsize, flags;
+  struct proc* p = myproc();
+
   if (argint(0, (int*)&oldaddr) < 0 || argint(1, &oldsize) < 0 || argint(2, &newsize) < 0 || argint(3, &flags) < 0) {
-    return -1;
+    return FAILED;
   }
-  return 0;
+
+  struct memmap* mmap = 0;
+  for (int i = 0; i < MAX_MEMMAPS; ++i) {
+    if (p->memmaps[i] && p->memmaps[i]->base == oldaddr && p->memmaps[i]->length == oldsize) {
+      mmap = p->memmaps[i];
+      break;
+    }
+  }
+
+  if (!mmap) return FAILED;
+
+  if (newsize < oldsize) {
+    uint start_unmap_addr = PGROUNDUP(oldaddr + newsize);
+    for (uint addr = start_unmap_addr; addr < oldaddr + oldsize; addr += PGSIZE) {
+      pte_t* pte = walkpgdir(p->pgdir, (void*)addr, 0);
+      if (pte && (*pte & PTE_P)) {
+        kfree(P2V(PTE_ADDR(*pte)));
+        *pte = 0;
+      }
+    }
+    mmap->length = newsize;
+    return oldaddr;
+  }
+
+  if ((can_expand_in_place(p, oldaddr, oldsize, newsize))) {
+    mmap->length = newsize;
+    return oldaddr;
+  }
+
+  if (flags & MREMAP_MAYMOVE) {
+    uint newaddr = find_new_location(p, newsize);
+    if (newaddr == 0) return FAILED;
+
+    struct memmap* newmmap = (struct memmap*)kalloc();
+    *newmmap = *mmap;
+    newmmap->base = newaddr;
+    newmmap->length = newsize;
+
+    for (uint offset = 0; offset < oldsize; offset += PGSIZE) {
+      char* mem = kalloc();
+      memmove(mem, (void*)(oldaddr + offset), PGSIZE);
+
+      mappages(p->pgdir, (void*)(newaddr + offset), PGSIZE, V2P(mem), PTE_W|PTE_U);
+
+      pte_t* pte = walkpgdir(p->pgdir, (void*)(oldaddr + offset), 0);
+      if (pte && (*pte & PTE_P)) {
+        kfree(P2V(PTE_ADDR(*pte)));
+        *pte = 0;
+      }
+    }
+
+    kfree((char*)mmap);
+    for (int i = 0; i < MAX_MEMMAPS; ++i) {
+      if (p->memmaps[i] == mmap) {
+        p->memmaps[i] = newmmap;
+        break;
+      }
+    }
+
+    return newaddr;
+  }
+
+  return FAILED;
 }
 
 int 
